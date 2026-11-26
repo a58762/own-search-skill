@@ -43,8 +43,9 @@ fi
 echo "=== 5. 模型与索引（可选，缺了只提示不打失败）==="
 MD="${PUA_GEMMA_DIR:-/sandbox/workspace/models/embeddinggemma300}"
 if [ -f "$MD/onnx/model_q4.onnx" ]; then ok "语义模型已就绪"; else echo "  skip 语义模型未安装（bash scripts/setup_models.sh）"; fi
-if [ -f "$HOME/.own-search/index.db" ]; then
-  N=$(python3 -c "import sqlite3;print(sqlite3.connect('$HOME/.own-search/index.db').execute('select count(*) from docs').fetchone()[0])" 2>/dev/null || echo 0)
+DBP="${OWN_SEARCH_DB:-/sandbox/workspace/.own-search/index.db}"
+if [ -f "$DBP" ]; then
+  N=$(python3 -c "import sqlite3;print(sqlite3.connect('$DBP').execute('select count(*) from docs').fetchone()[0])" 2>/dev/null || echo 0)
   [ "$N" -gt 0 ] && ok "索引有 $N 条文档" || bad "索引为空"
 else
   echo "  skip 索引未建立（python3 scripts/local_search.py index）"
