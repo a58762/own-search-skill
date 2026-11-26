@@ -1,0 +1,6 @@
+# 大文件不进仓库，由 setup_models.sh 下载
+models/
+bin/lightpanda
+*.log
+__pycache__/
+*.pyc
