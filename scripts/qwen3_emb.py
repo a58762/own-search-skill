@@ -94,6 +94,8 @@ def embed(texts, batch=16):
         feed = {"input_ids": ids, "attention_mask": mask}
         if "position_ids" in names:
             feed["position_ids"] = np.tile(np.arange(L, dtype=np.int64), (n, 1))
+        if "token_type_ids" in names:      # BERT/MiniLM 系列必需
+            feed["token_type_ids"] = np.zeros((n, L), dtype=np.int64)
         # 多模态模型的空输入（embeddinggemma-2 的 image/video/audio 特征，纯文本任务传空）
         for nm in ("image_features", "video_features", "audio_features"):
             if nm in names:
