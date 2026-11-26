@@ -1,0 +1,11 @@
+#!/bin/sh
+# aria2c 可移植包装器
+# 背景：沙箱重置会清掉 apt 装的 /usr/bin/aria2c（以及 /usr/local/bin 的软链），
+#       但 /sandbox/workspace 是持久层。故把二进制本体与依赖库都存这里。
+# 做法依据（英/德/日社区一致）：bundle .so + wrapper 设置 LD_LIBRARY_PATH，
+#       不必静态链接（aria2 官方无 Linux 静态版）。
+# libc/libm/ld-linux 不打包——它们属于基础镜像，不会随重置消失，硬带反而冲突。
+HERE=$(cd "$(dirname "$0")" && pwd)
+LD_LIBRARY_PATH="$HERE/aria2-lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH
+exec "$HERE/aria2c-real" "$@"
