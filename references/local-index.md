@@ -136,49 +136,50 @@ python3 scripts/local_search.py index --fetch-body --body-limit 6
 
 **解决什么**：词面匹配救不了同义与跨语言——搜「大语言模型」找不到只写了「LLM」的文章。
 
-**模型选型：按「社区真实使用 + 本机实测」双重筛选（2026-11-25）**
+**模型选型：三个维度对齐后才敢下结论（2026-11-26）**
 
-先看 HuggingFace 的真实数据（下载量/点赞是社区用脚投票的结果，不是编辑推荐）：
+**维度一：官方榜单（MTEB Multilingual v2，HF 模型卡一手数据）**
 
-| 模型 | 月下载 | 点赞 | 创建 | 结论 |
-|---|---|---|---|---|
-| `sentence-transformers/all-MiniLM-L6-v2` | 1.65 亿 | 6178 | 2021 | 纯英文，不适用多语言 |
-| **`BAAI/bge-m3`** | **3533 万** | **4041** | 2024-01 | 多语言赞数第一，两年后仍在 trending |
-| `intfloat/multilingual-e5-large` | 750 万 | 1292 | 2022 | 老牌多语言 |
-| `Qwen/Qwen3-Embedding-0.6B` | 697 万 | 1360 | 2025 | 阿里，119 语言 |
-| **`google/embeddinggemma-2`** | 60 万 | **3475** | 2026 | **trending 榜首（41）** |
-| `microsoft/harrier-oss-v1-0.6b` | 20 万 | 347 | 2026-03 | 很新，社区还没普及 |
-
-然后**全部下载实测**（同一套 self-retrieval，150 条语料 / 30 query / 标题做 query / doc 不含标题）：
-
-| 模型 | 体积 | 维度 | R@1 | R@5 |
-|---|---|---|---|---|
-| **embeddinggemma-300m q4** | **197MB** | 768 | **0.733** | **0.833** |
-| embeddinggemma-2（740M 多模态） | 174MB | 768 | 0.733 | 0.800 |
-| Harrier-OSS-V1-0.6B q4 | 399MB | 1024 | 0.567 | 0.767 |
-| MiniLM-multilingual | 450MB | 384 | 0.400 | 0.433 |
-| **bge-m3 int8**（赞数第一） | 542MB | 1024 | **0.133** | 0.267 |
-
-**结论：换 `EmbeddingGemma-300m`**。它同时满足「社区评价最高」（trending 榜首）和「实测最强」（R@1=0.733，比 Harrier +0.166，比 bge-m3 +0.600），体积还最小（197MB）。
-
-**关键教训**：
-- **点赞数 ≠ 任务上的强弱**。bge-m3 有 4041 赞，但在「短 query 找长文档」这个任务上 R@1 只有 0.133
-- **榜单排名也不能直接采信**。Harrier 在 MTEB v2 是 69.0，比 Gemma 的多语言分（61 左右）高，但实测反而低 0.166
-- **唯一可靠的是本机同条件实测**（`scripts/bench_one.py`）
-
-**评测设计必须避开的坑**（全部踩过，写在 cmp_embed.py 注释里）：
-1. `gold` 存数据库 id 而 `topk` 是行号 → 比对全错，R@1 恒为 0
-2. query 取自长正文中段，doc 只取前 1200 字 → 那句话根本不在被检索文本里
-3. 修好截断后取到的"句子"是图注碎片（`図2 images/fig02...`）→ 改用标题做 query
-4. doc 里含标题 → R@1 假性 1.0 泄漏 → doc 必须剔除标题
-
-**各模型的推理注意点（都踩过）**：
-| 模型 | pooling | padding | 特殊要求 |
+| 模型 | MTEB v2 分 | 维度 | 能否下载 |
 |---|---|---|---|
-| EmbeddingGemma | mean（mask 加权） | **必须关闭 padding**（ONNX 图对变长 batch 不兼容） | query 加 `task: search result \| query: `，doc 加 `title: none \| text: ` |
-| Harrier / Qwen3 | last-token | **必须左填充**（右填充会取到 pad 的隐状态） | query 加 `Instruct: ...\nQuery: ` |
-| bge-m3 / XLM-R | **CLS**（不是 mean） | 右填充 | 无前缀 |
-| Octen | last-token | 左填充 | 输出 batch 维**硬编码为 1** |
+| `harrier-oss-v1-27b` | **74.3**（检索列 0.7827 最高） | 5376 | 27B，放不下 |
+| `KaLM-Embedding-Gemma3-12B` | 72.32（**官方 MMTEB 榜 #1**） | 3840 | 12B，放不下 |
+| `Qwen3-Embedding-8B` | 70.58 | 7168 | 15GB，放不下 |
+| `harrier-oss-v1-0.6b` | 69.0 | 1024 | 399MB ✅ |
+| `harrier-oss-v1-270m` | 66.5 | 640 | 196MB ✅ |
+| `google/embeddinggemma-2`（740M） | 61.36 | 768 | 174MB ✅ |
+| `google/embeddinggemma-300m` | 61.15（English v2: **69.67**） | 768 | 197MB ✅ |
+
+**维度二：社区用脚投票（HF 月下载，注意 HF 不公开累计总量）**
+
+| 模型 | 月下载 | 点赞 |
+|---|---|---|
+| `all-MiniLM-L6-v2` | **1.65 亿** | 6178 |
+| `bge-m3` | 3533 万 | 4041 |
+| `paraphrase-multilingual-MiniLM-L12-v2` | 2483 万 | 1518 |
+| `multilingual-e5-large` | 750 万 | 1292 |
+| `Qwen3-Embedding-0.6B` | 697 万 | 1360 |
+| `embeddinggemma-2` | 60 万 | 3475 |
+| `harrier-oss-v1-0.6b` | 20 万 | 347 |
+
+**维度三：本机实测（150 条语料 / 30 query / 标题做 query / doc 不含标题 / 1200 字）**
+
+| 模型 | MTEB v2 | 月下载 | **R@1** | R@5 | 体积 |
+|---|---|---|---|---|---|
+| **embeddinggemma-300m** | 61.15 | 60 万 | **0.733** | **0.833** | 197MB |
+| harrier-oss-v1-270m | 66.5 | 12 万 | 0.700 | 0.800 | 196MB |
+| e5-large | — | 750 万 | 0.600 | 0.700 | 561MB |
+| harrier-oss-v1-0.6b | 69.0 | 20 万 | 0.567 | 0.767 | 399MB |
+| MiniLM-multilingual | — | 2483 万 | 0.400 | 0.433 | 450MB |
+| bge-m3 | — | 3533 万 | 0.133 | 0.267 | 542MB |
+| **all-MiniLM-L6-v2** | — | **1.65 亿** | **0.100** | 0.200 | 87MB |
+
+**三个结论，每一个都反直觉**：
+1. **下载量第一的最差**（all-MiniLM-L6-v2，1.65 亿下载，R@1 仅 0.100）——它是**纯英文模型**，我们语料含日/法/德/俄/中，读不懂就是读不懂。它的下载量来自 LangChain / LlamaIndex 的默认值，是生态惯性，不是能力证明。
+2. **MTEB 总分与实测相反**：Harrier-0.6B 榜上 69.0 比 Gemma 的 61.15 高 7.85 分，实测却低 0.166。原因是 **MTEB 是多任务平均（分类/聚类/重排/STS），且它的检索任务多是短 passage**；我们的场景是「短 query → 1200 字长文档」，这是不同的任务形态。
+3. **HF 只公开最近 30 天下载量，不提供累计总量**（API 的 `sort=downloadsAllTime` 会直接报错）。所以"总下载排名"这个指标在 HF 上不存在。
+
+**唯一可靠的选型方式：在你自己语料上跑同条件 recall@k**（`scripts/bench_one.py`）。
 
 ## JS 渲染：抓 React/Vue 空壳站（2026-11-25 落地）
 
