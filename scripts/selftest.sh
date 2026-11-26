@@ -34,12 +34,11 @@ grep -q '\.pua' "$SELF/scripts/local_search.py" && bad "local_search.py 仍引�
 t "数据目录可自定义" "grep -q OWN_SEARCH_DB '$SELF/scripts/local_search.py'"
 
 echo "=== 4. 下载器（可移植性）==="
-if [ -x "$SELF/scripts/aria2c" ]; then
-  t "aria2c wrapper 可执行" "'$SELF/scripts/aria2c' --version"
+if [ -x "$SELF/scripts/aria2c-real" ]; then
+  t "aria2c 便携包可用" "'$SELF/scripts/aria2c' --version"
 else
-  bad "aria2c wrapper 缺失"
+  echo "  skip aria2c 未生成（新机器跑: bash scripts/get_aria2.sh）"
 fi
-t "aria2-lib 库目录存在" "[ -d '$SELF/scripts/aria2-lib' ]"
 
 echo "=== 5. 模型与索引（可选，缺了只提示不打失败）==="
 MD="${PUA_GEMMA_DIR:-/sandbox/workspace/models/embeddinggemma300}"
