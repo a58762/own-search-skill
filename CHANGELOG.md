@@ -2,6 +2,30 @@
 
 本技能自 pua-pro v5.12 拆分而来（2026-11-26）。以下是检索能力的完整演进史。
 
+## v1.1（2026-11-26）模型选型三维对齐
+
+**补测三个此前遗漏的候选**
+- `all-MiniLM-L6-v2`（HF 月下载第一，1.65 亿）：**R@1=0.100，全场最低**。纯英文模型，在含日/法/德/俄/中的语料上完全读不懂。它的下载量来自 LangChain/LlamaIndex 默认值，是生态惯性
+- `harrier-oss-v1-270m`（640 维，MTEB v2 66.5）：**R@1=0.700**，体积 196MB——性价比很高，是 gemma 的最强备选
+- `e5-large`：R@1=0.600，561MB，不如 gemma
+
+**查清两件事**
+- **HF 不公开累计总下载量**（`sort=downloadsAllTime` 直接报错），只有最近 30 天。所以"总下载排名"这个指标在 HF 上不存在
+- **MTEB 官方榜与实测相反**：Harrier-0.6B 榜上 69.0 > Gemma 61.15，实测 R@1 却 0.567 < 0.733。原因是 MTEB 是多任务均值且检索任务多为短 passage，而我们测的是「短 query → 1200 字长文档」
+
+**官方榜一手数据（HF 模型卡）**
+| 模型 | MTEB v2 | 能否用 |
+|---|---|---|
+| harrier-oss-v1-27b | 74.3 | 27B 放不下 |
+| KaLM-Embedding-Gemma3-12B | 72.32（官方 MMTEB #1） | 12B 放不下 |
+| Qwen3-Embedding-8B | 70.58 | 15GB 放不下 |
+| harrier-oss-v1-0.6b | 69.0 | ✅ |
+| harrier-oss-v1-270m | 66.5 | ✅ |
+| embeddinggemma-2 (740M) | 61.36 | ✅ |
+| embeddinggemma-300m | 61.15（English 69.67） | ✅ |
+
+**数据路径修复**：索引默认位置从 `~/.own-search/`（/root，沙箱重置会清）改到 `/sandbox/workspace/.own-search/`（持久层）。这个坑实测丢过一次 917 条索引。
+
 ## v1.0（2026-11-26）拆分独立
 
 **从 pua-pro 抽出检索部分，成为独立技能**
