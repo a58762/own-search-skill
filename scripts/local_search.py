@@ -31,8 +31,8 @@ for _p in ("/opt/toolchain/pylibs",):
         sys.path.insert(0, _p)
 
 # 数据目录独立于 pua-pro 的状态目录（拆分后两个技能互不依赖）
-DB = os.environ.get("OWN_SEARCH_DB",
-                    os.path.expanduser("~/.own-search/index.db"))
+# 数据必须放持久层：~ 在 /root，沙箱重置会被清（实测踩过，索引全丢）
+DB = os.environ.get("OWN_SEARCH_DB", "/sandbox/workspace/.own-search/index.db")
 UA = "pua-pro-skill/1.0 (local index)"
 
 SOURCES = {
