@@ -26,7 +26,9 @@ N_DOC = int(os.environ.get("N_DOC", "150"))
 QI = ("Instruct: Given a web search query, retrieve relevant passages "
       "that answer the query\nQuery: ")
 MODELS = {
-    "minilm":  {"dim": 384,  "kind": "fastembed", "prompt": ""},
+    "minilm":  {"dim": 384,  "kind": "fastembed", "prompt": ""},          # multilingual
+    "minilm_en": {"dim": 384, "kind": "onnx", "pool": "mean", "pad": "right", "prompt": "",
+                  "dir": "/sandbox/workspace/models/minilm-en", "file": "model.onnx"},  # 纯英文模型
     "harrier": {"dim": 1024, "kind": "onnx", "prompt": QI,
                 "dir": "/sandbox/workspace/models/harrier-0.6b", "file": "model_q4.onnx"},
     "octen":   {"dim": 1024, "kind": "onnx", "prompt": QI,
@@ -34,6 +36,8 @@ MODELS = {
     "e5large": {"dim": 1024, "kind": "onnx", "pool": "mean", "pad": "right",
                 "prompt": "query: ", "doc_prompt": "passage: ",
                 "dir": "/sandbox/workspace/models/e5-large", "file": "model_quantized.onnx"},
+    "harrier270": {"dim": 640, "kind": "onnx", "prompt": QI, "pool": "pre",
+                   "dir": "/sandbox/workspace/models/harrier-270m", "file": "model_q4.onnx"},
     "gemma300": {"dim": 768, "kind": "onnx", "pool": "mean", "nopad": "1",
                  "prompt": "task: search result | query: ",
                  "doc_prompt": "title: none | text: ",
@@ -63,7 +67,12 @@ def main():
     dp = cfg.get("doc_prompt", "")
     texts = [dp + (r[2] or "")[:DL] for r in rows]   # 不含标题：标题做 query，正文做 doc，无泄漏
 
-    if cfg["kind"] == "fastembed":
+    if cfg["kind"] == "fastembed_en":
+        from fastembed import TextEmbedding
+        _m = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        V = np.array(list(_m.embed(texts)))
+        Vq = np.array(list(_m.embed(queries)))
+    elif cfg["kind"] == "fastembed":
         from fastembed import TextEmbedding
         m = TextEmbedding(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
                           specific_model_path="/sandbox/workspace/models/multilingual-minilm")
